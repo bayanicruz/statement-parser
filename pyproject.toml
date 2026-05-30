@@ -1,0 +1,16 @@
+[project]
+name = "statement-parser"
+version = "0.1.0"
+description = "Extract transactions from bank credit card statement PDFs into CSV"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+authors = [{ name = "Bayani Cruz" }]
+keywords = ["bank", "bank", "statement", "pdf", "csv"]
+dependencies = [
+    "pandas>=3.0.3",
+    "pdfplumber>=0.11.9",
+]
+
+[project.scripts]
+statement-parser = "main:main"
