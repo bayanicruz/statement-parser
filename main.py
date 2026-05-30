@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bank credit card statement PDF → CSV extractor."""
+"""bank credit card statement PDF → XLSX extractor."""
 import argparse
 import re
 from collections import defaultdict
@@ -8,6 +8,9 @@ from pathlib import Path
 
 import pandas as pd
 import pdfplumber
+from openpyxl import load_workbook
+from openpyxl.styles import Border, Font, Side
+from openpyxl.utils import get_column_letter
 
 OUTPUT_DIR = Path(__file__).parent / "output"
 DATE_RE = re.compile(r"^\d{2}/\d{2}/\d{4}$")
@@ -73,7 +76,76 @@ def extract(pdf_path: str | Path) -> pd.DataFrame:
         rows = [row for page in pdf.pages for row in _page_transactions(page)]
     if not rows:
         raise ValueError(f"No transactions found in {pdf_path}")
-    return pd.DataFrame(rows, columns=COL_NAMES)
+    df = pd.DataFrame(rows, columns=COL_NAMES)
+
+    cr_mask = df["Amount ($A)"].str.contains("CR", na=False)
+    numeric = df["Amount ($A)"].str.replace(r"[$,CR]", "", regex=True)
+    df.insert(df.columns.get_loc("Amount ($A)") + 1, "Credit ($A)",
+              pd.to_numeric(numeric.where(cr_mask), errors="coerce").mul(-1))
+    df["Amount ($A)"] = pd.to_numeric(numeric.where(~cr_mask), errors="coerce")
+
+    return df
+
+
+def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
+    """Add AutoFilter, AUD currency format, and per-card Summary box to the workbook."""
+    used_values = sorted(v for v in df["Used"].dropna().unique() if v)
+    SUMMARY_ROWS = 1 + len(used_values) + 2  # title + one row per card + subtotal (filtered) + total
+
+    wb = load_workbook(xlsx_path)
+    ws = wb.active
+    ws.insert_rows(1, SUMMARY_ROWS)
+
+    data_header = SUMMARY_ROWS + 1
+    data_start = data_header + 1
+    data_end = len(df) + SUMMARY_ROWS + 1
+    ncols = len(df.columns)
+    used_col = get_column_letter(df.columns.get_loc("Used") + 1)
+    amt_col = get_column_letter(df.columns.get_loc("Amount ($A)") + 1)
+    used_range = f"${used_col}${data_start}:${used_col}${data_end}"
+    amt_range = f"${amt_col}${data_start}:${amt_col}${data_end}"
+
+    ws.auto_filter.ref = f"A{data_header}:{get_column_letter(ncols)}{data_end}"
+
+    thin = Side(style="thin")
+    box = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    ws.merge_cells("I1:J1")
+    ws["I1"] = "Summary"
+    ws["I1"].font = Font(bold=True)
+
+    for i, card in enumerate(used_values, start=2):
+        ws[f"I{i}"] = card
+        ws[f"J{i}"] = f'=SUMIF({used_range},"{card}",{amt_range})'
+        ws[f"J{i}"].number_format = "$#,##0.00"
+
+    subtotal_row = SUMMARY_ROWS - 1
+    ws[f"I{subtotal_row}"] = "Subtotal (Filtered):"
+    ws[f"J{subtotal_row}"] = f"=SUBTOTAL(9,{amt_range})"
+    ws[f"J{subtotal_row}"].number_format = "$#,##0.00"
+
+    ws[f"I{SUMMARY_ROWS}"] = "Total:"
+    ws[f"J{SUMMARY_ROWS}"] = f"=SUM({amt_range})"
+    ws[f"J{SUMMARY_ROWS}"].number_format = "$#,##0.00"
+
+    for row in ws[f"I1:J{SUMMARY_ROWS}"]:
+        for cell in row:
+            cell.border = box
+
+    aud = "$#,##0.00"
+    for r in range(data_start, data_end + 1):
+        ws.cell(row=r, column=df.columns.get_loc("Amount ($A)") + 1).number_format = aud
+        ws.cell(row=r, column=df.columns.get_loc("Credit ($A)") + 1).number_format = aud
+
+    for col in ws.iter_cols():
+        max_len = max(
+            (len(str(cell.value)) for cell in col
+             if cell.value is not None and not str(cell.value).startswith("=")),
+            default=8,
+        )
+        ws.column_dimensions[get_column_letter(col[0].column)].width = max_len + 2
+
+    wb.save(xlsx_path)
 
 
 def main() -> None:
@@ -81,9 +153,11 @@ def main() -> None:
     parser.add_argument("pdf_path", type=Path)
     args = parser.parse_args()
     OUTPUT_DIR.mkdir(exist_ok=True)
-    csv_path = OUTPUT_DIR / args.pdf_path.with_suffix(".csv").name
-    extract(args.pdf_path).to_csv(csv_path, index=False)
-    print(csv_path)
+    df = extract(args.pdf_path)
+    xlsx_path = OUTPUT_DIR / args.pdf_path.with_suffix(".xlsx").name
+    df.to_excel(xlsx_path, index=False, engine="openpyxl")
+    _post_process(xlsx_path, df)
+    print(xlsx_path)
 
 
 if __name__ == "__main__":
