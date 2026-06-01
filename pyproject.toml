@@ -17,3 +17,4 @@ dependencies = [
 [project.scripts]
 statement-parser = "statements:main"
 transaction-tracker = "transaction:main"
+transaction-tracker-pdf = "transaction_v2:main"
