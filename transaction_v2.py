@@ -14,7 +14,7 @@ from openpyxl.styles import Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 BUDGET = 6250.00
-OUTPUT_DIR = Path(__file__).parent / "output" / "transactions"
+OUTPUT_DIR = Path(__file__).parent / "output" / "transaction_v2"
 
 MONTHS_FULL = {
     "January": 1, "February": 2, "March": 3, "April": 4,
@@ -274,7 +274,9 @@ def main() -> None:
             raise SystemExit("No file selected.")
         pdf_path = Path(chosen)
 
+    print(f"Extracting transactions from {pdf_path.name}...")
     df = extract(pdf_path)
+    print(f"Found {len(df)} transactions ({df['Date'].min().date()} → {df['Date'].max().date()})")
 
     start_str = _pick_date("Select start date (or Cancel for all)")
     end_str = _pick_date("Select end date (or Cancel for all)")
@@ -285,22 +287,33 @@ def main() -> None:
         df = df[df["Date"] <= pd.to_datetime(end_str)]
 
     if df.empty:
+        subprocess.run(["zenity", "--error", "--text=No transactions in the selected date range."])
         raise SystemExit("No transactions in the selected date range.")
 
     df = df.reset_index(drop=True)
+    print(f"{len(df)} transactions after date filter.")
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     xlsx_path = OUTPUT_DIR / pdf_path.with_suffix(".xlsx").name
 
     if xlsx_path.exists():
-        answer = input(f"{xlsx_path.name} already exists. [o]verwrite / [v]ersion up? ").strip().lower()
-        if answer == "v":
+        result = subprocess.run(
+            ["zenity", "--list", "--radiolist",
+             "--title=File exists",
+             f"--text={xlsx_path.name} already exists. Choose an action:",
+             "--column=", "--column=Action",
+             "TRUE", "Overwrite",
+             "FALSE", "Version up"],
+            capture_output=True, text=True,
+        )
+        answer = result.stdout.strip()
+        if answer == "Version up":
             stem = xlsx_path.stem
             n = 2
             while xlsx_path.exists():
                 xlsx_path = OUTPUT_DIR / f"{stem}_v{n}.xlsx"
                 n += 1
-        elif answer != "o":
+        elif answer != "Overwrite":
             raise SystemExit("Cancelled.")
 
     df.to_excel(xlsx_path, index=False, engine="openpyxl")

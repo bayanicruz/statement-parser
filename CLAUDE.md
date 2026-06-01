@@ -25,7 +25,7 @@ bank CSV downloads to `~/Downloads/bank.csv` with no header row: `Date, Amount, 
 uv run transaction_v2.py path/to/transactions.pdf   # or no arg for file picker
 transaction-tracker-pdf                              # entry point after uv sync
 ```
-Parses bank transaction history PDFs (saved from bank Internet Banking) → `output/transactions/<name>.xlsx`.
+Parses bank transaction history PDFs (saved from bank Internet Banking) → `output/transaction_v2/<name>.xlsx`.
 After selecting the PDF, two zenity calendar pickers appear for start and end date. Cancel either to skip that bound and include all transactions on that end.
 
 ---
