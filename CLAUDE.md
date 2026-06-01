@@ -2,26 +2,33 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Running the tool
+## Scripts
 
+### `statements.py` — PDF statement extractor
 ```bash
-# Install dependencies
-uv sync
-
-# Run against a statement PDF
-uv run main.py path/to/statement.pdf
-
-# Or via the installed entry point (after uv sync)
-statement-parser path/to/statement.pdf
+uv run statements.py path/to/statement.pdf   # or no arg for file picker
+statement-parser                              # entry point after uv sync
 ```
+Extracts transactions from an bank credit card statement PDF → `output/statements/<name>.xlsx`.
 
-Output is written to `output/<statement-name>.xlsx`. The script auto-opens the file after writing and prints the path to stdout.
+### `transaction.py` — CSV budget tracker
+```bash
+uv run transaction.py path/to/bank.csv        # or no arg for file picker
+transaction-tracker                           # entry point after uv sync
+```
+Converts the bank transaction CSV export → `output/transactions/<name>.xlsx` with a budget summary.
 
-If the output file already exists, the script prompts: `[o]verwrite / [v]ersion up` — versioning appends `_v2`, `_v3`, etc.
+bank CSV downloads to `~/Downloads/bank.csv` with no header row: `Date, Amount, Description`.
+
+---
+
+Both scripts auto-open the output after writing. If the output already exists, they prompt `[o]verwrite / [v]ersion up` — versioning appends `_v2`, `_v3`, etc.
 
 ## Architecture
 
-Single-file script (`main.py`) with three logical stages:
+### `statements.py`
+
+Three logical stages:
 
 1. **Extraction** (`extract`) — opens the PDF with `pdfplumber`, iterates every page, and collects transaction rows via `_page_transactions` / `_parse_row`. Table boundaries are detected automatically: starts when a row contains the word `Processed` (the column header) and stops at `Please refer` (the footer). No page range required.
 
@@ -35,7 +42,17 @@ Single-file script (`main.py`) with three logical stages:
 |---|---|
 | `CARD_MAX_OFFSET` | Max horizontal distance (pts) between a 4-digit token and the last date for it to be classified as a card number rather than part of the description |
 | `COL_NAMES` | Fixed output columns: `Processed, Transaction, Used, Transaction Details, Amount ($A), Balance` |
-| `OUTPUT_DIR` | `output/` relative to the script; created on first run |
+| `OUTPUT_DIR` | `output/statements/` or `output/transactions/` relative to the script; created on first run |
+
+### `transaction.py`
+
+Two stages:
+
+1. **Loading** (`load_transactions`) — reads the headerless bank CSV, flips all amounts to positive, and classifies each row as `Expense` (originally negative) or `Credit` (originally positive). Adds an empty `Category` column for manual tagging.
+
+2. **Post-processing** (`_post_process`) — writes a Summary box (cols G:H) showing Budget / Total Expenses / Total Credits / Net Spent / Remaining. Remaining is green when under budget, red when over. Highlights expense rows with the same spend tiers as `statements.py`; credit rows get a green highlight. Normalises all fonts to Calibri.
+
+**Budget constant:** `BUDGET = 6250.00` at the top of `transaction.py`.
 
 ## Stack
 
@@ -58,9 +75,15 @@ PDFs live in `files/` (not tracked by git). Processed XLSX outputs go to `output
 
 ## Monthly workflow
 
+**Statements:**
 1. Download the new statement PDF and rename it to `{YY}-statement-{DD}-{Mon}.pdf`, place in `files/`.
-2. Run `uv run main.py` — a file picker opens, select the PDF. Or pass the path directly: `uv run main.py files/<statement>.pdf`.
+2. Run `uv run statements.py` — file picker opens, select the PDF.
 3. The XLSX opens automatically. Verify the Summary box totals match the statement.
-4. Review and categorise transactions in the XLSX.
+
+**Transactions:**
+1. Export transactions from bank internet banking as CSV (`~/Downloads/bank.csv`).
+2. Run `uv run transaction.py` — file picker opens, select the CSV.
+3. The XLSX opens. Check the Summary box Remaining figure against your budget.
+4. Fill in the Category column for each transaction.
 
 > `zenity` is required for the file picker (`sudo apt install zenity` if missing).

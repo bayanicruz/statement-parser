@@ -13,7 +13,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-OUTPUT_DIR = Path(__file__).parent / "output"
+OUTPUT_DIR = Path(__file__).parent / "output" / "statements"
 DATE_RE = re.compile(r"^\d{2}/\d{2}/\d{4}$")
 CARD_RE = re.compile(r"^\d{4}$")
 CARD_MAX_OFFSET = 80  # max horizontal distance (pts) from last date to card-number word

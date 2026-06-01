@@ -15,4 +15,5 @@ dependencies = [
 ]
 
 [project.scripts]
-statement-parser = "main:main"
+statement-parser = "statements:main"
+transaction-tracker = "transaction:main"
