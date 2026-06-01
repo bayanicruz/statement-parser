@@ -20,13 +20,16 @@ Converts the bank transaction CSV export → `output/transactions/<name>.xlsx` w
 
 bank CSV downloads to `~/Downloads/bank.csv` with no header row: `Date, Amount, Description`.
 
-### `transaction_v2.py` — PDF budget tracker with date-range filter
+### `transaction_v2.py` — CSV budget tracker with outstanding authorisations and tentative planning
 ```bash
-uv run transaction_v2.py path/to/transactions.pdf   # or no arg for file picker
-transaction-tracker-pdf                              # entry point after uv sync
+uv run transaction_v2.py path/to/bank.csv   # or no arg for file picker
+transaction-tracker-pdf                    # entry point after uv sync
 ```
-Parses bank transaction history PDFs (saved from bank Internet Banking) → `output/transaction_v2/<name>.xlsx`.
-After selecting the PDF, two zenity calendar pickers appear for start and end date. Cancel either to skip that bound and include all transactions on that end.
+Same CSV source as `transaction.py` → `output/transaction_v2/<name>.xlsx`, with extra steps:
+1. A zenity text-info dialog to paste Outstanding Authorisations from bank — parsed and appended as `Outstanding` type rows.
+2. Five blank `Tentative` rows pre-appended for planned-but-uncertain purchases.
+
+Rows are sorted by Date descending (latest first); blank Tentative rows appear at the bottom.
 
 ---
 
@@ -58,16 +61,29 @@ Three logical stages:
 
 1. **Loading** (`load_transactions`) — reads the headerless bank CSV, flips all amounts to positive, and classifies each row as `Expense` (originally negative) or `Credit` (originally positive). Adds an empty `Category` column for manual tagging.
 
-2. **Post-processing** (`_post_process`) — writes a Summary box (cols G:H) showing Budget / Total Expenses / Total Credits / Net Spent / Remaining. Remaining is green when under budget, red when over. Highlights expense rows with the same spend tiers as `statements.py`; credit rows get a green highlight. Normalises all fonts to Calibri.
+2. **Post-processing** (`_post_process`) — writes a Summary box (cols G:H) with Excel formulas:
 
-`transaction_v2.py` replaces the CSV loading stage with a PDF extractor (`extract`) that uses pdfplumber word positions to parse bank Internet Banking transaction history PDFs. Key details:
-- Groups words by vertical band (`round(top)`), tracks month/year context from `Month YYYY` headers which can appear mid-page or carry across pages
-- Detects wrapped descriptions: lines with only description text within `SUFFIX_GAP_MAX` pts below a date band are appended as suffixes; lines above a date band are held as prefixes
-- Debit vs credit determined by x0 position of the `$` amount: x0 ≥ `CREDIT_X_MIN` (480) = credit
-- Skips browser chrome, column headers, account info, and "Important information" footer
-- After extraction, prompts for date range via `zenity --calendar`; cancelling either picker skips that bound
+   | Row | Label | Formula |
+   |---|---|---|
+   | H2 | Budget | `6250` |
+   | H3 | Total Expenses | `SUMIF` |
+   | H4 | Total Credits | `SUMIF` |
+   | H5 | Net Spent | `=H3-H4` |
+   | H6 | Remaining | `=H2-H5` 🟢/🔴 |
+   | H7 | Savings | `=3000+MIN(0,H6)` 🟢🟠🔴 |
 
-**Budget constant:** `BUDGET = 6250.00` at the top of `transaction.py` and `transaction_v2.py`.
+   Highlights expense rows with spend tiers; credit rows get green. All fonts normalised to Calibri.
+
+`transaction_v2.py` shares the same CSV loader but adds:
+- Outstanding Authorisations paste (zenity text-info dialog) — appended as `Outstanding` rows
+- Five blank `Tentative` rows for planned-but-uncertain purchases
+- Rows sorted by Date descending; blank Tentative rows at the bottom
+- **Two summary boxes** side by side:
+  - **Summary (G:H)** — confirmed actuals only (Budget / Confirmed Expenses / Outstanding / Total Credits / Net Spent / Remaining / Savings)
+  - **Projected (J:K)** — worst-case if tentative purchases go through (Tentative / Remaining / Savings); column I is a narrow spacer
+- Row types and highlights: `Expense` (spend tiers), `Credit` (green), `Outstanding` (spend tiers, no special colour), `Tentative` (lavender)
+
+**Constants:** `BUDGET = 6250.00`, `SAVINGS = 3000.00` at the top of both files.
 
 ## Stack
 

@@ -6,10 +6,12 @@ from pathlib import Path
 
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-BUDGET = 6250.00
+BUDGET  = 6250.00
+SAVINGS = 3000.00
 OUTPUT_DIR = Path(__file__).parent / "output" / "transactions"
 COL_NAMES = ["Date", "Amount", "Type", "Description", "Category"]
 
@@ -30,12 +32,7 @@ def load_transactions(csv_path: Path) -> pd.DataFrame:
 
 
 def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
-    expenses = df.loc[df["Type"] == "Expense", "Amount"].sum()
-    credits = df.loc[df["Type"] == "Credit", "Amount"].sum()
-    net_spent = expenses - credits
-    remaining = BUDGET - net_spent
-
-    SUMMARY_ROWS = 6  # title + budget + expenses + credits + net spent + remaining
+    SUMMARY_ROWS = 7  # title + budget + expenses + credits + net spent + remaining + savings
     ncols = len(COL_NAMES)
 
     wb = load_workbook(xlsx_path)
@@ -43,25 +40,30 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
     ws.insert_rows(1, SUMMARY_ROWS)
 
     data_header = SUMMARY_ROWS + 1
-    data_start = data_header + 1
-    data_end = len(df) + SUMMARY_ROWS + 1
+    data_start  = data_header + 1
+    data_end    = len(df) + SUMMARY_ROWS + 1
 
     ws.auto_filter.ref = f"A{data_header}:{get_column_letter(ncols)}{data_end}"
 
-    thin = Side(style="thin")
-    box = Border(left=thin, right=thin, top=thin, bottom=thin)
+    amt_col  = get_column_letter(COL_NAMES.index("Amount") + 1)
+    type_col = get_column_letter(COL_NAMES.index("Type") + 1)
+    rng_amt  = f"${amt_col}${data_start}:${amt_col}${data_end}"
+    rng_type = f"${type_col}${data_start}:${type_col}${data_end}"
 
-    # Summary box in cols G:H
+    thin = Side(style="thin")
+    box  = Border(left=thin, right=thin, top=thin, bottom=thin)
+
     ws.merge_cells("G1:H1")
     ws["G1"] = "Summary"
     ws["G1"].font = Font(name="Calibri", bold=True)
 
     summary_rows = [
-        ("Budget",          BUDGET),
-        ("Total Expenses",  expenses),
-        ("Total Credits",   credits),
-        ("Net Spent",       net_spent),
-        ("Remaining",       remaining),
+        ("Budget",         BUDGET),
+        ("Total Expenses", f'=SUMIF({rng_type},"Expense",{rng_amt})'),
+        ("Total Credits",  f'=SUMIF({rng_type},"Credit",{rng_amt})'),
+        ("Net Spent",      "=H3-H4"),
+        ("Remaining",      "=H2-H5"),
+        ("Savings",        f"={SAVINGS}+MIN(0,H6)"),
     ]
     for i, (label, value) in enumerate(summary_rows, start=2):
         ws[f"G{i}"] = label
@@ -70,11 +72,28 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
         ws[f"H{i}"].number_format = "$#,##0.00"
         ws[f"H{i}"].font = Font(name="Calibri")
 
-    # Colour remaining: green if under budget, red if over
-    remaining_fill = "C6EFCE" if remaining >= 0 else "FFB3B3"
-    ws["H6"].fill = PatternFill("solid", fgColor=remaining_fill)
+    ws.conditional_formatting.add("H6", CellIsRule(
+        operator="greaterThanOrEqual", formula=["0"],
+        fill=PatternFill("solid", fgColor="C6EFCE"),
+    ))
+    ws.conditional_formatting.add("H6", CellIsRule(
+        operator="lessThan", formula=["0"],
+        fill=PatternFill("solid", fgColor="FFB3B3"),
+    ))
+    ws.conditional_formatting.add("H7", CellIsRule(
+        operator="lessThan", formula=["0"],
+        fill=PatternFill("solid", fgColor="FFB3B3"),
+    ))
+    ws.conditional_formatting.add("H7", CellIsRule(
+        operator="lessThan", formula=[str(SAVINGS)],
+        fill=PatternFill("solid", fgColor="FFE0B2"),
+    ))
+    ws.conditional_formatting.add("H7", CellIsRule(
+        operator="greaterThanOrEqual", formula=[str(SAVINGS)],
+        fill=PatternFill("solid", fgColor="C6EFCE"),
+    ))
 
-    for row in ws["G1:H6"]:
+    for row in ws["G1:H7"]:
         for cell in row:
             cell.border = box
 
