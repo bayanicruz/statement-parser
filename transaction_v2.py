@@ -15,7 +15,7 @@ from openpyxl.utils import get_column_letter
 BUDGET  = 6250.00
 SAVINGS = 3000.00
 OUTPUT_DIR = Path(__file__).parent / "output" / "transaction_v2"
-COL_NAMES = ["Date", "Amount", "Type", "Description", "Category"]
+COL_NAMES = ["Date", "Amount", "Type", "Description"]
 
 MONTHS_ABBR = {
     "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
@@ -34,7 +34,6 @@ def load_transactions(csv_path: Path) -> pd.DataFrame:
     df["Amount"] = raw["_amt"].abs()
     df["Type"] = raw["_amt"].apply(lambda x: "Credit" if x > 0 else "Expense")
     df["Description"] = raw["Description"]
-    df["Category"] = ""
     return df
 
 
@@ -97,7 +96,6 @@ def parse_outstanding(text: str, year: int) -> pd.DataFrame:
                         "Amount": float(amt_str.replace(",", "")),
                         "Type": "Outstanding",
                         "Description": desc,
-                        "Category": "",
                     })
                 i += 1
             continue
@@ -121,6 +119,7 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
     data_end    = len(df) + SUMMARY_ROWS + 1
 
     ws.auto_filter.ref = f"A{data_header}:{get_column_letter(ncols)}{data_end}"
+    ws.freeze_panes = f"A{data_start}"
 
     amt_col  = get_column_letter(COL_NAMES.index("Amount") + 1)
     type_col = get_column_letter(COL_NAMES.index("Type") + 1)
@@ -293,7 +292,7 @@ def main() -> None:
             df = pd.concat([df, outstanding_df], ignore_index=True)
 
     blank_tentative = pd.DataFrame([
-        {"Date": None, "Amount": None, "Type": "Tentative", "Description": "", "Category": ""}
+        {"Date": None, "Amount": None, "Type": "Tentative", "Description": ""}
         for _ in range(5)
     ])
     df = pd.concat([df, blank_tentative], ignore_index=True)

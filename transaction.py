@@ -44,6 +44,7 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
     data_end    = len(df) + SUMMARY_ROWS + 1
 
     ws.auto_filter.ref = f"A{data_header}:{get_column_letter(ncols)}{data_end}"
+    ws.freeze_panes = f"A{data_start}"
 
     amt_col  = get_column_letter(COL_NAMES.index("Amount") + 1)
     type_col = get_column_letter(COL_NAMES.index("Type") + 1)
