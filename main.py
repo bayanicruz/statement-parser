@@ -2,6 +2,7 @@
 """bank credit card statement PDF → XLSX extractor."""
 import argparse
 import re
+import subprocess
 from collections import defaultdict
 from collections.abc import Iterator
 from pathlib import Path
@@ -9,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 import pdfplumber
 from openpyxl import load_workbook
-from openpyxl.styles import Border, Font, Side
+from openpyxl.styles import Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 OUTPUT_DIR = Path(__file__).parent / "output"
@@ -112,7 +113,7 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
 
     ws.merge_cells("I1:J1")
     ws["I1"] = "Summary"
-    ws["I1"].font = Font(bold=True)
+    ws["I1"].font = Font(name="Calibri", bold=True)
 
     for i, card in enumerate(used_values, start=2):
         ws[f"I{i}"] = card
@@ -133,9 +134,30 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
             cell.border = box
 
     aud = "$#,##0.00"
+    amt_col_idx = df.columns.get_loc("Amount ($A)") + 1
+    expense_fills = [
+        (1000, PatternFill("solid", fgColor="FFB3B3")),  # red
+        (600,  PatternFill("solid", fgColor="FFCCBC")),  # salmon
+        (300,  PatternFill("solid", fgColor="FFE0B2")),  # orange
+        (80,   PatternFill("solid", fgColor="FFF2CC")),  # yellow
+    ]
+
+    for r in range(data_header, data_end + 1):
+        for c in range(1, ncols + 1):
+            cell = ws.cell(row=r, column=c)
+            cell.font = Font(name="Calibri", bold=cell.font.bold if cell.font else False)
+
     for r in range(data_start, data_end + 1):
-        ws.cell(row=r, column=df.columns.get_loc("Amount ($A)") + 1).number_format = aud
+        ws.cell(row=r, column=amt_col_idx).number_format = aud
         ws.cell(row=r, column=df.columns.get_loc("Credit ($A)") + 1).number_format = aud
+        cell = ws.cell(row=r, column=amt_col_idx)
+        if isinstance(cell.value, (int, float)):
+            for threshold, fill in expense_fills:
+                if cell.value >= threshold:
+                    for c in range(1, amt_col_idx + 1):
+                        ws.cell(row=r, column=c).fill = fill
+                        ws.cell(row=r, column=c).font = Font(name="Calibri", bold=True)
+                    break
 
     for col in ws.iter_cols():
         max_len = max(
@@ -150,14 +172,38 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Extract transactions from a bank statement PDF.")
-    parser.add_argument("pdf_path", type=Path)
+    parser.add_argument("pdf_path", type=Path, nargs="?")
     args = parser.parse_args()
+
+    pdf_path = args.pdf_path
+    if pdf_path is None:
+        result = subprocess.run(
+            ["zenity", "--file-selection", "--title=Select statement PDF", "--file-filter=*.pdf"],
+            capture_output=True, text=True,
+        )
+        chosen = result.stdout.strip()
+        if not chosen:
+            raise SystemExit("No file selected.")
+        pdf_path = Path(chosen)
+
     OUTPUT_DIR.mkdir(exist_ok=True)
-    df = extract(args.pdf_path)
-    xlsx_path = OUTPUT_DIR / args.pdf_path.with_suffix(".xlsx").name
+    df = extract(pdf_path)
+    xlsx_path = OUTPUT_DIR / pdf_path.with_suffix(".xlsx").name
+
+    if xlsx_path.exists():
+        answer = input(f"{xlsx_path.name} already exists. [o]verwrite / [v]ersion up? ").strip().lower()
+        if answer == "v":
+            stem = xlsx_path.stem
+            n = 2
+            while xlsx_path.exists():
+                xlsx_path = OUTPUT_DIR / f"{stem}_v{n}.xlsx"
+                n += 1
+        elif answer != "o":
+            raise SystemExit("Cancelled.")
     df.to_excel(xlsx_path, index=False, engine="openpyxl")
     _post_process(xlsx_path, df)
     print(xlsx_path)
+    subprocess.Popen(["xdg-open", str(xlsx_path)])
 
 
 if __name__ == "__main__":
