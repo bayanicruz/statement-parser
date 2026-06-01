@@ -100,9 +100,9 @@ Tested against **bank Rewards Black** credit card statements. The auto-detection
 
 ## Statement files
 
-PDFs live in `files/` (not tracked by git). Processed XLSX outputs go to `output/`.
+PDFs can be stored anywhere and selected via the file picker. Processed XLSX outputs go to `output/` (gitignored).
 
-**Naming convention:** `files/{YY}-statement-{DD}-{Mon}.pdf` (e.g. `26-statement-24-Mar.pdf`).
+**Naming convention:** `{YY}-statement-{DD}-{Mon}.pdf` (e.g. `26-statement-24-Mar.pdf`).
 
 ## Monthly workflow
 
