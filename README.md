@@ -1,6 +1,6 @@
 # statement-parser
 
-Extracts transactions from bank credit card statement PDFs into CSV.
+A set of personal finance scripts that convert bank statement PDFs and transaction CSVs into formatted Excel workbooks with budget summaries.
 
 No Java required — uses [pdfplumber](https://github.com/jsvine/pdfplumber) for pure-Python PDF parsing.
 
@@ -8,6 +8,7 @@ No Java required — uses [pdfplumber](https://github.com/jsvine/pdfplumber) for
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
+- `zenity` for file picker dialogs (`sudo apt install zenity`)
 
 ## Installation
 
@@ -17,19 +18,31 @@ cd statement-parser
 uv sync
 ```
 
-## Usage
+## Scripts
+
+### `statements.py` — Statement PDF extractor
+Extracts transactions from a credit card statement PDF → `output/statements/<name>.xlsx`.
 
 ```bash
-uv run main.py path/to/statement.pdf
+uv run statements.py path/to/statement.pdf   # or no arg for file picker
+statement-parser                              # entry point after uv sync
 ```
 
-The CSV is written to `output/<statement-name>.csv`.
+### `transaction.py` — CSV budget tracker
+Converts a transaction CSV export → `output/transactions/<name>.xlsx` with a budget summary.
 
-## Compatibility
+```bash
+uv run transaction.py path/to/transactions.csv   # or no arg for file picker
+transaction-tracker                               # entry point after uv sync
+```
 
-Tested against **bank Rewards Black** credit card statements. The parser detects the transaction table by looking for the `Processed` column header and stops at the `Please refer to the last four digits...` footer — so it should work across statement periods without hardcoded page numbers.
+### `transaction_v2.py` — CSV budget tracker with outstanding authorisations
+Same as `transaction.py` with an extra step to paste outstanding/pending authorisations and tentative planned purchases.
 
-May work with other bank credit card statement formats that share the same layout.
+```bash
+uv run transaction_v2.py path/to/transactions.csv   # or no arg for file picker
+transaction-tracker-pdf                              # entry point after uv sync
+```
 
 ## License
 

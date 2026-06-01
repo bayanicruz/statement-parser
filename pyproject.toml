@@ -1,12 +1,12 @@
 [project]
 name = "statement-parser"
 version = "0.1.0"
-description = "Extract transactions from bank credit card statement PDFs into CSV"
+description = "Extract transactions from credit card statement PDFs into Excel workbooks"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
 authors = [{ name = "Bayani Cruz" }]
-keywords = ["bank", "bank", "statement", "pdf", "csv"]
+keywords = ["bank", "statement", "pdf", "csv", "budget"]
 dependencies = [
     "odfpy>=1.4.1",
     "openpyxl>=3.1.5",

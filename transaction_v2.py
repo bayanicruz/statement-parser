@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bank transaction CSV → XLSX budget tracker with outstanding authorisations."""
+"""Transaction CSV → XLSX budget tracker with outstanding authorisations."""
 import argparse
 import re
 import subprocess
@@ -24,7 +24,7 @@ MONTHS_ABBR = {
 
 
 def load_transactions(csv_path: Path) -> pd.DataFrame:
-    raw = pd.read_csv(csv_path, header=None, names=["Date", "_amt", "Description"])
+    raw = pd.read_csv(csv_path, header=None, names=["Date", "_amt", "Description"])  # headerless: Date, Amount, Description
     raw["_amt"] = pd.to_numeric(
         raw["_amt"].astype(str).str.replace('"', "").str.strip(),
         errors="coerce",
@@ -266,14 +266,14 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Convert bank transaction CSV to XLSX with outstanding authorisations.")
+    parser = argparse.ArgumentParser(description="Convert transaction CSV to XLSX with outstanding authorisations.")
     parser.add_argument("csv_path", type=Path, nargs="?")
     args = parser.parse_args()
 
     csv_path = args.csv_path
     if csv_path is None:
         result = subprocess.run(
-            ["zenity", "--file-selection", "--title=Select bank CSV", "--file-filter=*.csv"],
+            ["zenity", "--file-selection", "--title=Select CSV", "--file-filter=*.csv"],
             capture_output=True, text=True,
         )
         chosen = result.stdout.strip()

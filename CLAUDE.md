@@ -9,24 +9,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 uv run statements.py path/to/statement.pdf   # or no arg for file picker
 statement-parser                              # entry point after uv sync
 ```
-Extracts transactions from an bank credit card statement PDF → `output/statements/<name>.xlsx`.
+Extracts transactions from a credit card statement PDF → `output/statements/<name>.xlsx`.
 
 ### `transaction.py` — CSV budget tracker
 ```bash
-uv run transaction.py path/to/bank.csv        # or no arg for file picker
+uv run transaction.py path/to/transactions.csv   # or no arg for file picker
 transaction-tracker                           # entry point after uv sync
 ```
-Converts the bank transaction CSV export → `output/transactions/<name>.xlsx` with a budget summary.
+Converts the transaction CSV export → `output/transactions/<name>.xlsx` with a budget summary.
 
-bank CSV downloads to `~/Downloads/bank.csv` with no header row: `Date, Amount, Description`.
+The CSV has no header row: `Date, Amount, Description`.
 
 ### `transaction_v2.py` — CSV budget tracker with outstanding authorisations and tentative planning
 ```bash
-uv run transaction_v2.py path/to/bank.csv   # or no arg for file picker
+uv run transaction_v2.py path/to/transactions.csv   # or no arg for file picker
 transaction-tracker-pdf                    # entry point after uv sync
 ```
 Same CSV source as `transaction.py` → `output/transaction_v2/<name>.xlsx`, with extra steps:
-1. A zenity text-info dialog to paste Outstanding Authorisations from bank — parsed and appended as `Outstanding` type rows.
+1. A zenity text-info dialog to paste Outstanding Authorisations — parsed and appended as `Outstanding` type rows.
 2. Five blank `Tentative` rows pre-appended for planned-but-uncertain purchases.
 
 Rows are sorted by Date descending (latest first); blank Tentative rows appear at the bottom.
@@ -59,7 +59,7 @@ Three logical stages:
 
 `transaction.py` has two stages:
 
-1. **Loading** (`load_transactions`) — reads the headerless bank CSV, flips all amounts to positive, and classifies each row as `Expense` (originally negative) or `Credit` (originally positive). Adds an empty `Category` column for manual tagging.
+1. **Loading** (`load_transactions`) — reads the headerless transactions CSV, flips all amounts to positive, and classifies each row as `Expense` (originally negative) or `Credit` (originally positive). Adds an empty `Category` column for manual tagging.
 
 2. **Post-processing** (`_post_process`) — writes a Summary box (cols G:H) with Excel formulas:
 
@@ -96,7 +96,7 @@ Three logical stages:
 
 ## Compatibility
 
-Tested against **bank Rewards Black** credit card statements. The auto-detection logic should generalise across statement periods; if extraction returns no rows, the PDF layout may have changed — check that the `Processed` column header and `Please refer` footer text still appear verbatim.
+Tested against **Rewards Black** credit card statements. The auto-detection logic should generalise across statement periods; if extraction returns no rows, the PDF layout may have changed — check that the `Processed` column header and `Please refer` footer text still appear verbatim.
 
 ## Statement files
 
@@ -107,12 +107,12 @@ PDFs can be stored anywhere and selected via the file picker. Processed XLSX out
 ## Monthly workflow
 
 **Statements:**
-1. Download the new statement PDF and rename it to `{YY}-statement-{DD}-{Mon}.pdf`, place in `files/`.
+1. Download the new statement PDF and rename it to `{YY}-statement-{DD}-{Mon}.pdf`.
 2. Run `uv run statements.py` — file picker opens, select the PDF.
 3. The XLSX opens automatically. Verify the Summary box totals match the statement.
 
 **Transactions:**
-1. Export transactions from bank internet banking as CSV (`~/Downloads/bank.csv`).
+1. Export transactions from internet banking as CSV.
 2. Run `uv run transaction.py` — file picker opens, select the CSV.
 3. The XLSX opens. Check the Summary box Remaining figure against your budget.
 4. Fill in the Category column for each transaction.

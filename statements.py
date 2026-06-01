@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bank credit card statement PDF → XLSX extractor."""
+"""Credit card statement PDF → XLSX extractor."""
 import argparse
 import re
 import subprocess
@@ -171,7 +171,7 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Extract transactions from a bank statement PDF.")
+    parser = argparse.ArgumentParser(description="Extract transactions from a credit card statement PDF.")
     parser.add_argument("pdf_path", type=Path, nargs="?")
     args = parser.parse_args()
 
