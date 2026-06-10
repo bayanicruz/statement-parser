@@ -107,7 +107,7 @@ def parse_outstanding(text: str, year: int) -> pd.DataFrame:
 
 
 def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
-    SUMMARY_ROWS = 8  # title + budget + confirmed + outstanding + credits + net spent + remaining + savings
+    SUMMARY_ROWS = 6  # title + budget + confirmed expenses + outstanding + remaining + savings
     ncols = len(COL_NAMES)
 
     wb = load_workbook(xlsx_path)
@@ -129,6 +129,7 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
     thin = Side(style="thin")
     box  = Border(left=thin, right=thin, top=thin, bottom=thin)
 
+    # Summary box (G:H)
     ws.merge_cells("G1:H1")
     ws["G1"] = "Summary"
     ws["G1"].font = Font(name="Calibri", bold=True)
@@ -137,10 +138,8 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
         ("Budget",             BUDGET),
         ("Confirmed Expenses", f'=SUMIF({rng_type},"Expense",{rng_amt})'),
         ("Outstanding",        f'=SUMIF({rng_type},"Outstanding",{rng_amt})'),
-        ("Total Credits",      f'=SUMIF({rng_type},"Credit",{rng_amt})'),
-        ("Net Spent",          "=H3+H4-H5"),
-        ("Remaining",          "=H2-H6"),
-        ("Savings",            f"={SAVINGS}+MIN(0,H7)"),
+        ("Remaining",          "=H2-H3-H4"),
+        ("Savings",            f"={SAVINGS}+MIN(0,H5)"),
     ]
     for i, (label, value) in enumerate(summary_rows, start=2):
         ws[f"G{i}"] = label
@@ -150,16 +149,16 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
         ws[f"H{i}"].font = Font(name="Calibri")
 
     # Remaining: green ≥0, red <0
-    ws.conditional_formatting.add("H7", CellIsRule(
+    ws.conditional_formatting.add("H5", CellIsRule(
         operator="greaterThanOrEqual", formula=["0"],
         fill=PatternFill("solid", fgColor="C6EFCE"),
     ))
-    ws.conditional_formatting.add("H7", CellIsRule(
+    ws.conditional_formatting.add("H5", CellIsRule(
         operator="lessThan", formula=["0"],
         fill=PatternFill("solid", fgColor="FFB3B3"),
     ))
     # Savings: 3-tier
-    for cell_ref in ("H8", "K4"):
+    for cell_ref in ("H6", "K4"):
         ws.conditional_formatting.add(cell_ref, CellIsRule(
             operator="lessThan", formula=["0"],
             fill=PatternFill("solid", fgColor="FFB3B3"),
@@ -182,17 +181,17 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
         fill=PatternFill("solid", fgColor="FFB3B3"),
     ))
 
-    for row in ws["G1:H8"]:
+    for row in ws["G1:H6"]:
         for cell in row:
             cell.border = box
 
-    # Projected box in J:K (col I is a spacer)
+    # Projected box (J:K, col I = spacer)
     ws.merge_cells("J1:K1")
     ws["J1"] = "Projected"
     ws["J1"].font = Font(name="Calibri", bold=True)
     projected_rows = [
         ("Tentative", f'=SUMIF({rng_type},"Tentative",{rng_amt})'),
-        ("Remaining", "=H7-K2"),
+        ("Remaining", "=H5-K2"),
         ("Savings",   f"={SAVINGS}+MIN(0,K3)"),
     ]
     for i, (label, value) in enumerate(projected_rows, start=2):
@@ -202,6 +201,23 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
         ws[f"K{i}"].number_format = "$#,##0.00"
         ws[f"K{i}"].font = Font(name="Calibri")
     for row in ws["J1:K4"]:
+        for cell in row:
+            cell.border = box
+
+    # Credits box (M:N, col L = spacer)
+    ws.merge_cells("M1:N1")
+    ws["M1"] = "Credits"
+    ws["M1"].font = Font(name="Calibri", bold=True)
+    credits_rows = [
+        ("Total Credits", f'=SUMIF({rng_type},"Credit",{rng_amt})'),
+    ]
+    for i, (label, value) in enumerate(credits_rows, start=2):
+        ws[f"M{i}"] = label
+        ws[f"M{i}"].font = Font(name="Calibri")
+        ws[f"N{i}"] = value
+        ws[f"N{i}"].number_format = "$#,##0.00"
+        ws[f"N{i}"].font = Font(name="Calibri")
+    for row in ws["M1:N2"]:
         for cell in row:
             cell.border = box
 
@@ -261,6 +277,11 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
     proj_value_width = len(f"${BUDGET:,.2f}") + 2
     ws.column_dimensions["J"].width = proj_label_width
     ws.column_dimensions["K"].width = proj_value_width
+    ws.column_dimensions["L"].width = 2  # spacer between Projected and Credits
+    credits_label_width = max(len(label) for label, _ in credits_rows) + 2
+    credits_value_width = len(f"${BUDGET:,.2f}") + 2
+    ws.column_dimensions["M"].width = credits_label_width
+    ws.column_dimensions["N"].width = credits_value_width
 
     wb.save(xlsx_path)
 
