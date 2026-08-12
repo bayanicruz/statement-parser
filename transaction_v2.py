@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.formatting.rule import CellIsRule
-from openpyxl.styles import Border, Font, PatternFill, Side
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 BUDGET  = 6250.00
@@ -128,6 +128,50 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
 
     thin = Side(style="thin")
     box  = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    # Header graphic (A1:D6)
+    latest_date = df["Date"].dropna().max()
+    period_str  = latest_date.strftime("%b %Y") if pd.notna(latest_date) else "—"
+
+    dark_fill  = PatternFill("solid", fgColor="1F4E79")
+    mid_fill   = PatternFill("solid", fgColor="2E75B6")
+    light_fill = PatternFill("solid", fgColor="DEEAF1")
+    center     = Alignment(horizontal="center", vertical="center")
+
+    ws.row_dimensions[1].height = 22
+    ws.row_dimensions[2].height = 22
+    for r in range(3, 7):
+        ws.row_dimensions[r].height = 18
+
+    ws.merge_cells("A1:D2")
+    ws["A1"].value     = "BUDGET TRACKER"
+    ws["A1"].font      = Font(name="Calibri", bold=True, size=16, color="FFFFFF")
+    ws["A1"].fill      = dark_fill
+    ws["A1"].alignment = center
+
+    ws.merge_cells("A3:B4")
+    ws["A3"].value     = "PERIOD"
+    ws["A3"].font      = Font(name="Calibri", bold=True, size=10, color="FFFFFF")
+    ws["A3"].fill      = mid_fill
+    ws["A3"].alignment = center
+
+    ws.merge_cells("C3:D4")
+    ws["C3"].value     = period_str
+    ws["C3"].font      = Font(name="Calibri", bold=True, size=12, color="1F4E79")
+    ws["C3"].fill      = light_fill
+    ws["C3"].alignment = center
+
+    ws.merge_cells("A5:B6")
+    ws["A5"].value     = "MONTHLY BUDGET"
+    ws["A5"].font      = Font(name="Calibri", bold=True, size=10, color="FFFFFF")
+    ws["A5"].fill      = mid_fill
+    ws["A5"].alignment = center
+
+    ws.merge_cells("C5:D6")
+    ws["C5"].value     = f"${BUDGET:,.2f}"
+    ws["C5"].font      = Font(name="Calibri", bold=True, size=12, color="1F4E79")
+    ws["C5"].fill      = light_fill
+    ws["C5"].alignment = center
 
     # Summary box (G:H)
     ws.merge_cells("G1:H1")
