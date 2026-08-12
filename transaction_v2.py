@@ -248,20 +248,46 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
         for cell in row:
             cell.border = box
 
-    # Credits box (M:N, col L = spacer)
+    # Forecast box (M:N, col L = spacer)
     ws.merge_cells("M1:N1")
-    ws["M1"] = "Credits"
+    ws["M1"] = "Forecast"
     ws["M1"].font = Font(name="Calibri", bold=True)
+    date_rng = f"$A${data_start}:$A${data_end}"
+    forecast_rows = [
+        ("Origin",          f"=MIN({date_rng})"),
+        ("End Date",        "=M2+30"),
+        ("Days Remaining",  "=M3-TODAY()"),
+        ("Forecast Spend",  f"=(H3/(TODAY()-M2))*30"),
+        ("Budget/Day Left", "=H5/M4"),
+    ]
+    for i, (label, value) in enumerate(forecast_rows, start=2):
+        ws[f"M{i}"] = label
+        ws[f"M{i}"].font = Font(name="Calibri")
+        ws[f"N{i}"] = value
+        ws[f"N{i}"].font = Font(name="Calibri")
+    ws["N2"].number_format = "DD-MMM-YYYY"
+    ws["N3"].number_format = "DD-MMM-YYYY"
+    ws["N4"].number_format = "0"
+    ws["N5"].number_format = "$#,##0.00"
+    ws["N6"].number_format = "$#,##0.00"
+    for row in ws["M1:N6"]:
+        for cell in row:
+            cell.border = box
+
+    # Credits box (P:Q, col O = spacer)
+    ws.merge_cells("P1:Q1")
+    ws["P1"] = "Credits"
+    ws["P1"].font = Font(name="Calibri", bold=True)
     credits_rows = [
         ("Total Credits", f'=SUMIF({rng_type},"Credit",{rng_amt})'),
     ]
     for i, (label, value) in enumerate(credits_rows, start=2):
-        ws[f"M{i}"] = label
-        ws[f"M{i}"].font = Font(name="Calibri")
-        ws[f"N{i}"] = value
-        ws[f"N{i}"].number_format = "$#,##0.00"
-        ws[f"N{i}"].font = Font(name="Calibri")
-    for row in ws["M1:N2"]:
+        ws[f"P{i}"] = label
+        ws[f"P{i}"].font = Font(name="Calibri")
+        ws[f"Q{i}"] = value
+        ws[f"Q{i}"].number_format = "$#,##0.00"
+        ws[f"Q{i}"].font = Font(name="Calibri")
+    for row in ws["P1:Q2"]:
         for cell in row:
             cell.border = box
 
@@ -321,11 +347,16 @@ def _post_process(xlsx_path: Path, df: pd.DataFrame) -> None:
     proj_value_width = len(f"${BUDGET:,.2f}") + 2
     ws.column_dimensions["J"].width = proj_label_width
     ws.column_dimensions["K"].width = proj_value_width
-    ws.column_dimensions["L"].width = 2  # spacer between Projected and Credits
+    ws.column_dimensions["L"].width = 2  # spacer between Projected and Forecast
+    forecast_label_width = max(len(label) for label, _ in forecast_rows) + 2
+    forecast_value_width = len("DD-MMM-YYYY") + 2
+    ws.column_dimensions["M"].width = forecast_label_width
+    ws.column_dimensions["N"].width = forecast_value_width
+    ws.column_dimensions["O"].width = 2  # spacer between Forecast and Credits
     credits_label_width = max(len(label) for label, _ in credits_rows) + 2
     credits_value_width = len(f"${BUDGET:,.2f}") + 2
-    ws.column_dimensions["M"].width = credits_label_width
-    ws.column_dimensions["N"].width = credits_value_width
+    ws.column_dimensions["P"].width = credits_label_width
+    ws.column_dimensions["Q"].width = credits_value_width
 
     wb.save(xlsx_path)
 
